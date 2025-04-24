@@ -175,7 +175,7 @@ export class EDFReader {
     const annSignalIndex = header.signals.findIndex(sig =>
       sig.label.includes("EDF Annotations")
     );
-    let signalByteOffset = header.signals
+    const signalByteOffset = header.signals
       .slice(0, annSignalIndex)
       .reduce((sum, s) => sum + s.samplesPerRecord * 2, 0);
     const bytes = header.signals[annSignalIndex].samplesPerRecord * 2;

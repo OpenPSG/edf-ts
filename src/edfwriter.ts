@@ -64,7 +64,7 @@ export class EDFWriter {
           );
           dataBytes.push(...encodedAnn);
         } else {
-          for (let sample of signalData[s].slice(start, end)) {
+          for (const sample of signalData[s].slice(start, end)) {
             const raw = this.physicalToDigital(sample, signal);
             dataBytes.push(raw & 0xff, (raw >> 8) & 0xff); // Little endian
           }
