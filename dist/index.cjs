@@ -1,0 +1,326 @@
+"use strict";
+var __create = Object.create;
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+
+// src/index.ts
+var index_exports = {};
+__export(index_exports, {
+  EDFReader: () => EDFReader,
+  EDFWriter: () => EDFWriter
+});
+module.exports = __toCommonJS(index_exports);
+
+// src/edfreader.ts
+var import_date_fns = require("date-fns");
+var import_lodash = __toESM(require("lodash"), 1);
+var EDFReader = class {
+  constructor(byteArray) {
+    this.textDecoder = new TextDecoder("ascii");
+    this.view = new DataView(byteArray.buffer, byteArray.byteOffset);
+    this.byteArray = byteArray;
+  }
+  readHeader() {
+    if (this.header) return this.header;
+    const headerText = this.textDecoder.decode(this.byteArray.subarray(0, 256));
+    const version = headerText.substring(0, 8).trim();
+    const patientId = headerText.substring(8, 88).trim();
+    const recordingId = headerText.substring(88, 168).trim();
+    const startDateStr = headerText.substring(168, 176).trim();
+    const startTimeStr = headerText.substring(176, 184).trim();
+    const startTime = (0, import_date_fns.parse)(
+      `${startDateStr} ${startTimeStr}`,
+      "dd.MM.yy HH.mm.ss",
+      /* @__PURE__ */ new Date()
+    );
+    const headerBytes = parseInt(headerText.substring(184, 192).trim());
+    const reserved = headerText.substring(192, 236).trim();
+    const dataRecords = parseInt(headerText.substring(236, 244).trim());
+    const recordDuration = parseFloat(headerText.substring(244, 252).trim());
+    const signalCount = parseInt(headerText.substring(252, 256).trim());
+    const signals = [];
+    for (let i = 0; i < signalCount; i++) {
+      const signal = {};
+      signal.label = this.readFieldText(signalCount, 0, 16, i).trim();
+      signal.transducerType = this.readFieldText(signalCount, 16, 96, i).trim();
+      signal.physicalDimension = this.readFieldText(signalCount, 96, 104, i).trim();
+      signal.physicalMin = parseFloat(this.readFieldText(signalCount, 104, 112, i));
+      signal.physicalMax = parseFloat(this.readFieldText(signalCount, 112, 120, i));
+      signal.digitalMin = parseInt(this.readFieldText(signalCount, 120, 128, i));
+      signal.digitalMax = parseInt(this.readFieldText(signalCount, 128, 136, i));
+      signal.prefiltering = this.readFieldText(signalCount, 136, 216, i).trim();
+      signal.samplesPerRecord = parseInt(this.readFieldText(signalCount, 216, 224, i));
+      signal.reserved = this.readFieldText(signalCount, 224, 256, i).trim();
+      signals.push(signal);
+    }
+    this.header = {
+      version,
+      patientId,
+      recordingId,
+      startTime,
+      headerBytes,
+      reserved,
+      dataRecords,
+      recordDuration,
+      signalCount,
+      signals
+    };
+    return import_lodash.default.cloneDeep(this.header);
+  }
+  readSignal(signalIndex, recordNumber) {
+    const header = this.header ?? this.readHeader();
+    const signal = header.signals[signalIndex];
+    const samplesPerRecord = signal.samplesPerRecord;
+    const samples = [];
+    const offset = header.headerBytes;
+    const recordSize = header.signals.reduce(
+      (sum, s) => sum + s.samplesPerRecord * 2,
+      0
+    );
+    const startRecord = recordNumber ?? 0;
+    const endRecord = recordNumber !== void 0 ? recordNumber + 1 : header.dataRecords;
+    const signalByteOffset = header.signals.slice(0, signalIndex).reduce((sum, s) => sum + s.samplesPerRecord * 2, 0);
+    for (let rec = startRecord; rec < endRecord; rec++) {
+      const recOffset = offset + rec * recordSize;
+      for (let j = 0; j < samplesPerRecord; j++) {
+        const sampleOffset = recOffset + signalByteOffset + j * 2;
+        const raw = this.view.getInt16(sampleOffset, true);
+        const physical = this.digitalToPhysical(raw, signal);
+        samples.push(physical);
+      }
+    }
+    return samples;
+  }
+  readAnnotations(recordNumber) {
+    const header = this.header ?? this.readHeader();
+    const annSignalIndex = header.signals.findIndex(
+      (sig) => sig.label.includes("EDF Annotations")
+    );
+    if (annSignalIndex === -1) return [];
+    const annotations = [];
+    const offset = header.headerBytes;
+    const recordSize = header.signals.reduce(
+      (sum, s) => sum + s.samplesPerRecord * 2,
+      0
+    );
+    const startRecord = recordNumber ?? 0;
+    const endRecord = recordNumber !== void 0 ? recordNumber + 1 : header.dataRecords;
+    const signalByteOffset = header.signals.slice(0, annSignalIndex).reduce((sum, s) => sum + s.samplesPerRecord * 2, 0);
+    const annSignal = header.signals[annSignalIndex];
+    const bytes = annSignal.samplesPerRecord * 2;
+    for (let rec = startRecord; rec < endRecord; rec++) {
+      const recOffset = offset + rec * recordSize;
+      const start = recOffset + signalByteOffset;
+      const end = start + bytes;
+      const slice = this.byteArray.subarray(start, end);
+      const text = this.textDecoder.decode(slice).replace(/\0/g, "");
+      let currentOnset = 0;
+      let currentDuration = void 0;
+      for (const entry of text.split("")) {
+        if (!entry) continue;
+        if (entry.startsWith("+") || /^-?\d+\.?\d*/.test(entry)) {
+          const parts = entry.split("");
+          currentOnset = parseFloat(parts[0]) || 0;
+          currentDuration = parts.length >= 2 ? parseFloat(parts[1]) : void 0;
+        } else {
+          annotations.push({
+            onset: currentOnset,
+            duration: currentDuration,
+            annotation: entry.trim()
+          });
+        }
+      }
+    }
+    return annotations;
+  }
+  getRecordTimeStamps() {
+    if (this.recordTimestamps) return this.recordTimestamps;
+    const header = this.readHeader();
+    const timestamps = new Array(header.dataRecords).fill(0);
+    const recordSize = header.signals.reduce(
+      (sum, s) => sum + s.samplesPerRecord * 2,
+      0
+    );
+    const annSignalIndex = header.signals.findIndex(
+      (sig) => sig.label.includes("EDF Annotations")
+    );
+    const signalByteOffset = header.signals.slice(0, annSignalIndex).reduce((sum, s) => sum + s.samplesPerRecord * 2, 0);
+    const bytes = header.signals[annSignalIndex].samplesPerRecord * 2;
+    for (let rec = 0; rec < header.dataRecords; rec++) {
+      const recOffset = header.headerBytes + rec * recordSize;
+      const start = recOffset + signalByteOffset;
+      const end = start + bytes;
+      const slice = this.byteArray.subarray(start, end);
+      const text = this.textDecoder.decode(slice).replace(/\0/g, "");
+      const entries = text.split("").filter((e) => e);
+      if (entries.length > 0 && /^[-+]/.test(entries[0])) {
+        const parts = entries[0].split("");
+        const offset = parseFloat(parts[0]) || 0;
+        timestamps[rec] = offset;
+      }
+    }
+    this.recordTimestamps = timestamps;
+    return timestamps;
+  }
+  readFieldText(signalCount, start, end, signalIndex) {
+    const offset = 256 + start * signalCount + (end - start) * signalIndex;
+    return this.textDecoder.decode(
+      this.byteArray.subarray(offset, offset + (end - start))
+    );
+  }
+  digitalToPhysical(digital, signal) {
+    const { digitalMin, digitalMax, physicalMin, physicalMax } = signal;
+    if (digitalMax === digitalMin) return 0;
+    return physicalMin + (digital - digitalMin) * (physicalMax - physicalMin) / (digitalMax - digitalMin);
+  }
+};
+
+// src/edfwriter.ts
+var EDFWriter = class {
+  constructor(header, signalData, annotations) {
+    this.header = header;
+    this.signalData = signalData;
+    this.annotations = annotations;
+    this.textEncoder = new TextEncoder();
+  }
+  write() {
+    const { header, signalData } = this;
+    const signalCount = header.signalCount;
+    const records = header.dataRecords;
+    if (signalData.length !== signalCount) {
+      throw new Error("Signal data length does not match signal count");
+    }
+    for (let i = 0; i < signalCount; i++) {
+      const signal = header.signals[i];
+      const expectedSamples = signal.samplesPerRecord * records;
+      const currentSamples = signalData[i].length;
+      if (currentSamples < expectedSamples) {
+        const padAmount = expectedSamples - currentSamples;
+        signalData[i] = signalData[i].concat(Array(padAmount).fill(0));
+      } else if (currentSamples > expectedSamples) {
+        throw new Error(
+          `Signal ${i} has too many samples (${currentSamples} > ${expectedSamples})`
+        );
+      }
+    }
+    const headerString = this.buildHeader();
+    const headerBytes = this.textEncoder.encode(headerString);
+    const dataBytes = [];
+    const annotationSignalIndex = header.signals.findIndex(
+      (sig) => sig.label.includes("EDF Annotations")
+    );
+    const hasAnnotations = annotationSignalIndex !== -1;
+    for (let rec = 0; rec < records; rec++) {
+      for (let s = 0; s < signalCount; s++) {
+        const signal = header.signals[s];
+        const start = rec * signal.samplesPerRecord;
+        const end = start + signal.samplesPerRecord;
+        if (hasAnnotations && s === annotationSignalIndex) {
+          const annText = this.generateAnnotationBlock(rec);
+          const encodedAnn = this.encodeAnnotationSignal(
+            annText,
+            signal.samplesPerRecord * 2
+          );
+          dataBytes.push(...encodedAnn);
+        } else {
+          for (const sample of signalData[s].slice(start, end)) {
+            const raw = this.physicalToDigital(sample, signal);
+            dataBytes.push(raw & 255, raw >> 8 & 255);
+          }
+        }
+      }
+    }
+    const fullBuffer = new Uint8Array(headerBytes.length + dataBytes.length);
+    fullBuffer.set(headerBytes);
+    fullBuffer.set(dataBytes, headerBytes.length);
+    return fullBuffer.buffer;
+  }
+  buildHeader() {
+    const { header } = this;
+    const field = (val, length) => val.padEnd(length).substring(0, length);
+    const startTime = header.startTime;
+    const dateStr = startTime.toISOString().slice(2, 10).replace(/-/g, ".");
+    const timeStr = startTime.toTimeString().slice(0, 8).replace(/:/g, ".");
+    let text = "";
+    text += field(header.version, 8);
+    text += field(header.patientId, 80);
+    text += field(header.recordingId, 80);
+    text += field(dateStr, 8);
+    text += field(timeStr, 8);
+    text += field(String(header.headerBytes), 8);
+    text += field(header.reserved, 44);
+    text += field(String(header.dataRecords), 8);
+    text += field(header.recordDuration.toFixed(6), 8);
+    text += field(String(header.signalCount), 4);
+    const signals = header.signals;
+    const collect = (cb, len) => signals.map(cb).map((v) => field(v, len)).join("");
+    text += collect((s) => s.label, 16);
+    text += collect((s) => s.transducerType, 80);
+    text += collect((s) => s.physicalDimension, 8);
+    text += collect((s) => s.physicalMin.toString(), 8);
+    text += collect((s) => s.physicalMax.toString(), 8);
+    text += collect((s) => s.digitalMin.toString(), 8);
+    text += collect((s) => s.digitalMax.toString(), 8);
+    text += collect((s) => s.prefiltering, 80);
+    text += collect((s) => s.samplesPerRecord.toString(), 8);
+    text += collect((s) => s.reserved, 32);
+    return text;
+  }
+  physicalToDigital(value, signal) {
+    const { digitalMin, digitalMax, physicalMin, physicalMax } = signal;
+    if (physicalMax === physicalMin) return 0;
+    const digital = Math.round(
+      (value - physicalMin) * (digitalMax - digitalMin) / (physicalMax - physicalMin) + digitalMin
+    );
+    return Math.max(digitalMin, Math.min(digitalMax, digital));
+  }
+  encodeAnnotationSignal(text, byteLength) {
+    const encoded = new TextEncoder().encode(text);
+    const buf = new Uint8Array(byteLength);
+    buf.set(encoded.slice(0, byteLength));
+    return Array.from(buf);
+  }
+  generateAnnotationBlock(record) {
+    if (!this.annotations) return "";
+    const startTime = record * this.header.recordDuration;
+    const endTime = startTime + this.header.recordDuration;
+    const anns = this.annotations.filter(
+      (a) => a.onset >= startTime && a.onset < endTime
+    );
+    let text = "";
+    for (const ann of anns) {
+      text += `+${ann.onset.toFixed(3)}${ann.duration?.toFixed(3) ?? ""}${ann.annotation}`;
+    }
+    text += "\0";
+    return text;
+  }
+};
+// Annotate the CommonJS export names for ESM import in node:
+0 && (module.exports = {
+  EDFReader,
+  EDFWriter
+});
