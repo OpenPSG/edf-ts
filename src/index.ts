@@ -1,3 +1,3 @@
-export * from './edftypes';
-export * from './edfreader';
-export * from './edfwriter';
+export * from "./edftypes";
+export * from "./edfreader";
+export * from "./edfwriter";

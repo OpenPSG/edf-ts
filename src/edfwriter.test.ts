@@ -5,6 +5,7 @@
 import fs from "fs";
 import path from "path";
 import { EDFWriter } from "./edfwriter";
+import { EDFReader } from "./edfreader";
 import { EDFHeader, EDFSignal, EDFAnnotation } from "./edftypes";
 
 function createTestHeader(signalCount = 1, records = 1): EDFHeader {
@@ -37,6 +38,18 @@ function createTestHeader(signalCount = 1, records = 1): EDFHeader {
   };
 }
 
+// Signal data will be subject to quantization and rounding errors.
+function expectToBeImprecise(
+  actual: number[],
+  expected: number[],
+  epsilon = 1e-2,
+) {
+  expect(actual.length).toBe(expected.length);
+  for (let i = 0; i < actual.length; i++) {
+    expect(Math.abs(actual[i] - expected[i])).toBeLessThanOrEqual(epsilon);
+  }
+}
+
 describe("EDFWriter", () => {
   it("writes a simple EDF file without annotations", () => {
     const header = createTestHeader(1, 2);
@@ -47,6 +60,15 @@ describe("EDFWriter", () => {
 
     expect(buffer).toBeInstanceOf(ArrayBuffer);
     expect(buffer.byteLength).toBeGreaterThan(header.headerBytes);
+
+    const reader = new EDFReader(new Uint8Array(buffer));
+
+    const readHeader = reader.readHeader();
+    expect(readHeader).toEqual(header);
+
+    const readSignal = reader.readSignal(0);
+    expect(readSignal.length).toBe(20);
+    expectToBeImprecise(readSignal, signalData[0]);
   });
 
   it("pads signal data when too short", () => {
@@ -67,13 +89,8 @@ describe("EDFWriter", () => {
   });
 
   it("writes with annotations if present", () => {
-    const header = createTestHeader(2, 1);
-    header.signals[1].label = "EDF Annotations";
-
-    const signalData = [
-      Array(10).fill(0), // actual signal
-      [], // annotation signal is empty (generated internally)
-    ];
+    const header = createTestHeader(1, 1);
+    const signalData = [[...Array(10).keys()].map((i) => i - 10)];
 
     const annotations: EDFAnnotation[] = [
       { onset: 0, duration: 0.5, annotation: "Start" },
@@ -85,6 +102,26 @@ describe("EDFWriter", () => {
 
     expect(buffer).toBeInstanceOf(ArrayBuffer);
     expect(buffer.byteLength).toBeGreaterThan(header.headerBytes);
+
+    const reader = new EDFReader(new Uint8Array(buffer));
+
+    const readHeader = reader.readHeader();
+    expect(readHeader).toEqual(header);
+
+    const readSignal = reader.readSignal(0);
+    expect(readSignal.length).toBe(10);
+    expectToBeImprecise(readSignal, signalData[0]);
+
+    const readAnnnotations = reader.readAnnotations();
+    expect(readAnnnotations.length).toBe(2);
+
+    expect(readAnnnotations[0].onset).toBe(0);
+    expect(readAnnnotations[0].duration).toBe(0.5);
+    expect(readAnnnotations[0].annotation).toBe("Start");
+
+    expect(readAnnnotations[1].onset).toBe(0.5);
+    expect(readAnnnotations[1].duration).toBeUndefined();
+    expect(readAnnnotations[1].annotation).toBe("Event A");
   });
 
   it("writes a test signal to an EDF file", async () => {
@@ -134,5 +171,41 @@ describe("EDFWriter", () => {
     fs.writeFileSync(outPath, Buffer.from(buffer));
 
     expect(fs.existsSync(outPath)).toBe(true);
+  });
+});
+
+describe("PatientID", () => {
+  it("should build a full patient ID string", () => {
+    const result = EDFWriter.patientId({
+      hospitalCode: "MCH 0234567",
+      sex: "F",
+      birthdate: new Date("1951-08-02"),
+      name: "Haagse Harry",
+    });
+
+    expect(result).toBe("MCH_0234567 F 02-AUG-1951 Haagse_Harry");
+  });
+
+  it("should fill in X for missing values", () => {
+    const result = EDFWriter.patientId({});
+    expect(result).toBe("X X X X");
+  });
+});
+
+describe("RecordingID", () => {
+  it("should build a full recording ID string", () => {
+    const result = EDFWriter.recordingId({
+      startDate: new Date("2002-03-02"),
+      studyCode: "PSG 1234/2002",
+      technicianCode: "NN",
+      equipmentCode: "Telemetry 03",
+    });
+
+    expect(result).toBe("Startdate 02-MAR-2002 PSG_1234/2002 NN Telemetry_03");
+  });
+
+  it("should fill in X for missing values", () => {
+    const result = EDFWriter.recordingId({});
+    expect(result).toBe("Startdate X X X X");
   });
 });

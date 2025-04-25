@@ -2,7 +2,6 @@
 //
 // Copyright (C) 2025 The OpenPSG Authors.
 
-import { parse as parseDate } from "date-fns";
 import { EDFHeader, EDFSignal, EDFAnnotation, EDFVersion } from "./edftypes";
 import _ from "lodash";
 
@@ -28,16 +27,17 @@ export class EDFReader {
     const recordingId = headerText.substring(88, 168).trim();
     const startDateStr = headerText.substring(168, 176).trim();
     const startTimeStr = headerText.substring(176, 184).trim();
-    const startTime = parseDate(
-      `${startDateStr} ${startTimeStr}`,
-      "dd.MM.yy HH.mm.ss",
-      new Date(),
-    );
     const headerBytes = parseInt(headerText.substring(184, 192).trim());
     const reserved = headerText.substring(192, 236).trim();
     const dataRecords = parseInt(headerText.substring(236, 244).trim());
     const recordDuration = parseFloat(headerText.substring(244, 252).trim());
     const signalCount = parseInt(headerText.substring(252, 256).trim());
+
+    // Clamp the date to deal with Y2K issues
+    const [day, month, year] = startDateStr.split(".").map(Number);
+    const fullYear = year >= 85 ? 1900 + year : 2000 + year;
+    const [hour, minute, second] = startTimeStr.split(".").map(Number);
+    const startTime = new Date(fullYear, month - 1, day, hour, minute, second);
 
     const signals: EDFSignal[] = [];
 
@@ -45,13 +45,28 @@ export class EDFReader {
       const signal: Partial<EDFSignal> = {};
       signal.label = this.readFieldText(signalCount, 0, 16, i).trim();
       signal.transducerType = this.readFieldText(signalCount, 16, 96, i).trim();
-      signal.physicalDimension = this.readFieldText(signalCount, 96, 104, i).trim();
-      signal.physicalMin = parseFloat(this.readFieldText(signalCount, 104, 112, i));
-      signal.physicalMax = parseFloat(this.readFieldText(signalCount, 112, 120, i));
-      signal.digitalMin = parseInt(this.readFieldText(signalCount, 120, 128, i));
-      signal.digitalMax = parseInt(this.readFieldText(signalCount, 128, 136, i));
+      signal.physicalDimension = this.readFieldText(
+        signalCount,
+        96,
+        104,
+        i,
+      ).trim();
+      signal.physicalMin = parseFloat(
+        this.readFieldText(signalCount, 104, 112, i),
+      );
+      signal.physicalMax = parseFloat(
+        this.readFieldText(signalCount, 112, 120, i),
+      );
+      signal.digitalMin = parseInt(
+        this.readFieldText(signalCount, 120, 128, i),
+      );
+      signal.digitalMax = parseInt(
+        this.readFieldText(signalCount, 128, 136, i),
+      );
       signal.prefiltering = this.readFieldText(signalCount, 136, 216, i).trim();
-      signal.samplesPerRecord = parseInt(this.readFieldText(signalCount, 216, 224, i));
+      signal.samplesPerRecord = parseInt(
+        this.readFieldText(signalCount, 216, 224, i),
+      );
       signal.reserved = this.readFieldText(signalCount, 224, 256, i).trim();
       signals.push(signal as EDFSignal);
     }
@@ -172,8 +187,8 @@ export class EDFReader {
       (sum, s) => sum + s.samplesPerRecord * 2,
       0,
     );
-    const annSignalIndex = header.signals.findIndex(sig =>
-      sig.label.includes("EDF Annotations")
+    const annSignalIndex = header.signals.findIndex((sig) =>
+      sig.label.includes("EDF Annotations"),
     );
     const signalByteOffset = header.signals
       .slice(0, annSignalIndex)
@@ -187,7 +202,7 @@ export class EDFReader {
       const slice = this.byteArray.subarray(start, end);
       const text = this.textDecoder.decode(slice).replace(/\0/g, "");
 
-      const entries = text.split("\u0014").filter(e => e);
+      const entries = text.split("\u0014").filter((e) => e);
       if (entries.length > 0 && /^[-+]/.test(entries[0])) {
         const parts = entries[0].split("\u0015");
         const offset = parseFloat(parts[0]) || 0;

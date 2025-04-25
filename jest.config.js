@@ -3,6 +3,6 @@ export default {
   testEnvironment: "node",
   transform: {
     "^.+\\.js$": "babel-jest",
-    "^.+\\.tsx?$": ["ts-jest",{}],
+    "^.+\\.tsx?$": ["ts-jest", {}],
   },
 };
