@@ -26,8 +26,15 @@ function createTestHeader(signalCount = 1, records = 1): EDFHeader {
 
   return {
     version: "0",
-    patientId: "Test Patient",
-    recordingId: "Test Recording",
+    patientId: EDFWriter.patientId({
+      hospitalCode: "MCH 0234567",
+    }),
+    recordingId: EDFWriter.recordingId({
+      startDate: new Date("2023-01-01"),
+      studyCode: "Test Study",
+      technicianCode: "Tech 123",
+      equipmentCode: "Equipment 456",
+    }),
     startTime: new Date("2023-01-01T00:00:00"),
     headerBytes: 256 + 256 * signalCount,
     reserved: "EDF+C",
@@ -140,8 +147,15 @@ describe("EDFWriter", () => {
 
     const header: EDFHeader = {
       version: "0",
-      patientId: "Test Patient",
-      recordingId: "Test Recording",
+      patientId: EDFWriter.patientId({
+        hospitalCode: "MCH 0234567",
+      }),
+      recordingId: EDFWriter.recordingId({
+        startDate: new Date("2023-01-01"),
+        studyCode: "Test Study",
+        technicianCode: "Tech 123",
+        equipmentCode: "Equipment 456",
+      }),
       startTime: new Date("2023-01-01T00:00:00"),
       headerBytes: 512,
       reserved: "",

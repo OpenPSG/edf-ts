@@ -151,25 +151,32 @@ export class EDFReader {
       const start = recOffset + signalByteOffset;
       const end = start + bytes;
       const slice = this.byteArray.subarray(start, end);
-      const text = this.textDecoder.decode(slice).replace(/\0/g, "");
+      const text = this.textDecoder.decode(slice);
 
-      let currentOnset = 0;
-      let currentDuration: number | undefined = undefined;
+      const TALs = text.split("\u0000").filter((s) => s.trim().length > 0);
 
-      for (const entry of text.split("\u0014")) {
-        if (!entry) continue;
+      for (const tal of TALs) {
+        const parts = tal.split("\u0014").filter((s) => s.length > 0);
+        if (parts.length === 0) continue;
 
-        if (entry.startsWith("+") || /^-?\d+\.?\d*/.test(entry)) {
-          const parts = entry.split("\u0015");
-          currentOnset = parseFloat(parts[0]) || 0;
-          currentDuration =
-            parts.length >= 2 ? parseFloat(parts[1]) : undefined;
-        } else {
-          annotations.push({
-            onset: currentOnset,
-            duration: currentDuration,
-            annotation: entry.trim(),
-          });
+        const time = parts[0];
+        let onset = 0;
+        let duration: number | undefined = undefined;
+
+        if (time.startsWith("+") || time.startsWith("-")) {
+          const [onsetStr, durationStr] = time.split("\u0015");
+          onset = parseFloat(onsetStr);
+          if (durationStr !== undefined) {
+            duration = parseFloat(durationStr);
+          }
+
+          for (let i = 1; i < parts.length; i++) {
+            annotations.push({
+              onset,
+              duration,
+              annotation: parts[i].trim(),
+            });
+          }
         }
       }
     }

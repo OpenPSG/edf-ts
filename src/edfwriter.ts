@@ -167,15 +167,12 @@ export class EDFWriter {
       annotationIndex = this.header.signals.length - 1;
     }
 
-    const recordDuration = this.header.recordDuration;
-    const samples = this.calculateMinimumAnnotationSamplesPerRecord(
+    const samplesPerRecord = this.calculateMinimumAnnotationSamplesPerRecord(
       this.annotations,
-      recordDuration,
     );
+    this.header.signals[annotationIndex].samplesPerRecord = samplesPerRecord;
 
-    this.header.signals[annotationIndex].samplesPerRecord = samples;
-
-    const totalSamples = samples * this.header.dataRecords;
+    const totalSamples = samplesPerRecord * this.header.dataRecords;
 
     while (this.signalData.length <= annotationIndex) {
       this.signalData.push([]);
@@ -197,27 +194,14 @@ export class EDFWriter {
 
   private calculateMinimumAnnotationSamplesPerRecord(
     annotations: EDFAnnotation[],
-    recordDuration: number,
   ): number {
     if (!annotations.length) return 1;
 
-    const records: Map<number, string[]> = new Map();
-
-    for (const ann of annotations) {
-      const record = Math.floor(ann.onset / recordDuration);
-      if (!records.has(record)) records.set(record, []);
-
-      const parts: string[] = [];
-      parts.push(`+${ann.onset.toFixed(3)}`);
-      if (ann.duration != null) parts.push(`\u0015${ann.duration.toFixed(3)}`);
-      parts.push(`\u0014${ann.annotation}\u0014`);
-
-      records.get(record)!.push(parts.join(""));
-    }
-
     let maxBytesPerRecord = 0;
-    for (const anns of records.values()) {
-      const text = anns.join("") + "\u0000";
+
+    const recordCount = this.header.dataRecords;
+    for (let record = 0; record < recordCount; record++) {
+      const text = this.generateAnnotationBlock(record);
       const bytes = new TextEncoder().encode(text);
       maxBytesPerRecord = Math.max(maxBytesPerRecord, bytes.length);
     }
@@ -293,20 +277,25 @@ export class EDFWriter {
     const startTime = recordNumber * this.header.recordDuration;
     const endTime = startTime + this.header.recordDuration;
 
+    // Grab annotations that fall within this record's time window
     const anns = this.annotations.filter(
       (a) => a.onset >= startTime && a.onset < endTime,
     );
 
     let text = "";
+
+    // 1. Timekeeping TAL (required, even if no annotations)
+    text += `+${startTime.toFixed(3)}\u0014\u0014\u0000`;
+
+    // 2. One valid TAL per annotation
     for (const ann of anns) {
       text += `+${ann.onset.toFixed(3)}`;
-      if (ann.duration != undefined) {
+      if (ann.duration !== undefined) {
         text += `\u0015${ann.duration.toFixed(3)}`;
       }
-      text += `\u0014${ann.annotation}\u0014`;
+      text += `\u0014${ann.annotation}\u0014\u0000`;
     }
 
-    text += "\u0000";
     return text;
   }
 }
