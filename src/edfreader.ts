@@ -93,7 +93,7 @@ export class EDFReader {
     const samplesPerRecord = signal.samplesPerRecord;
     const samples: number[] = [];
 
-    const offset = header.headerBytes;
+    const offset = header.headerBytes!;
     const recordSize = header.signals.reduce(
       (sum, s) => sum + s.samplesPerRecord * 2,
       0,
@@ -129,7 +129,7 @@ export class EDFReader {
     if (annSignalIndex === -1) return [];
 
     const annotations: EDFAnnotation[] = [];
-    const offset = header.headerBytes;
+    const offset = header.headerBytes!;
     const recordSize = header.signals.reduce(
       (sum, s) => sum + s.samplesPerRecord * 2,
       0,
@@ -203,7 +203,7 @@ export class EDFReader {
     const bytes = header.signals[annSignalIndex].samplesPerRecord * 2;
 
     for (let rec = 0; rec < header.dataRecords; rec++) {
-      const recOffset = header.headerBytes + rec * recordSize;
+      const recOffset = header.headerBytes! + rec * recordSize;
       const start = recOffset + signalByteOffset;
       const end = start + bytes;
       const slice = this.byteArray.subarray(start, end);

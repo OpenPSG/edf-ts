@@ -157,7 +157,6 @@ export class EDFWriter {
         digitalMax: 32767,
         prefiltering: "",
         samplesPerRecord: 0,
-        reserved: "",
       };
 
       this.header.signals.push(annotationSignal);
@@ -218,13 +217,15 @@ export class EDFWriter {
     const dateStr = format(startTime, "dd.MM.yy");
     const timeStr = format(startTime, "HH.mm.ss");
 
+    const headerBytes = 256 + 256 * header.signalCount;
+
     let text = "";
     text += field(header.version, 8);
     text += field(header.patientId, 80);
     text += field(header.recordingId, 80);
     text += field(dateStr, 8);
     text += field(timeStr, 8);
-    text += field(String(header.headerBytes), 8);
+    text += field(String(headerBytes), 8);
 
     // Mark the file as EDF+ if it has annotations, otherwise use plain EDF.
     const hasAnnotations = this.annotations && this.annotations.length > 0;
@@ -251,7 +252,7 @@ export class EDFWriter {
     text += collect((s) => s.digitalMax.toString(), 8);
     text += collect((s) => s.prefiltering, 80);
     text += collect((s) => s.samplesPerRecord.toString(), 8);
-    text += collect((s) => s.reserved, 32);
+    text += collect((s) => s.reserved || "", 32);
 
     return text;
   }

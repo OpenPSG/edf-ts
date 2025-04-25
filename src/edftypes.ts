@@ -9,8 +9,8 @@ export interface EDFHeader {
   patientId: string;
   recordingId: string;
   startTime: Date;
-  headerBytes: number;
-  reserved: string;
+  headerBytes?: number;
+  reserved?: string;
   dataRecords: number;
   recordDuration: number;
   signalCount: number;
@@ -27,7 +27,7 @@ export interface EDFSignal {
   digitalMax: number;
   prefiltering: string;
   samplesPerRecord: number;
-  reserved: string;
+  reserved?: string;
 }
 
 export interface EDFAnnotation {

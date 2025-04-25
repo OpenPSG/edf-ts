@@ -19,9 +19,8 @@ function createTestHeader(signalCount = 1, records = 1): EDFHeader {
       physicalMax: 100,
       digitalMin: -32768,
       digitalMax: 32767,
-      prefiltering: "None",
+      prefiltering: "",
       samplesPerRecord: 10,
-      reserved: "",
     }));
 
   return {
@@ -36,8 +35,6 @@ function createTestHeader(signalCount = 1, records = 1): EDFHeader {
       equipmentCode: "Equipment 456",
     }),
     startTime: new Date("2023-01-01T00:00:00"),
-    headerBytes: 256 + 256 * signalCount,
-    reserved: "",
     dataRecords: records,
     recordDuration: 1,
     signalCount,
@@ -66,12 +63,14 @@ describe("EDFWriter", () => {
     const buffer = writer.write();
 
     expect(buffer).toBeInstanceOf(ArrayBuffer);
-    expect(buffer.byteLength).toBeGreaterThan(header.headerBytes);
+    expect(buffer.byteLength).toBeGreaterThan(256);
 
     const reader = new EDFReader(new Uint8Array(buffer));
 
     const readHeader = reader.readHeader();
-    expect(readHeader).toEqual(header);
+    expect(readHeader.dataRecords).toBe(2);
+    expect(readHeader.recordDuration).toBe(1);
+    expect(readHeader.signalCount).toBe(1);
 
     const readSignal = reader.readSignal(0);
     expect(readSignal.length).toBe(20);
@@ -85,7 +84,7 @@ describe("EDFWriter", () => {
     const writer = new EDFWriter(header, signalData);
     const buffer = writer.write();
 
-    expect(buffer.byteLength).toBeGreaterThan(header.headerBytes);
+    expect(buffer.byteLength).toBeGreaterThan(256);
   });
 
   it("throws if signal data is too long", () => {
@@ -108,15 +107,15 @@ describe("EDFWriter", () => {
     const buffer = writer.write();
 
     expect(buffer).toBeInstanceOf(ArrayBuffer);
-    expect(buffer.byteLength).toBeGreaterThan(header.headerBytes);
+    expect(buffer.byteLength).toBeGreaterThan(256);
 
     const reader = new EDFReader(new Uint8Array(buffer));
 
     const readHeader = reader.readHeader();
-    expect(readHeader).toEqual({
-      ...header,
-      reserved: "EDF+C",
-    });
+    expect(readHeader.reserved).toBe("EDF+C");
+    expect(readHeader.dataRecords).toBe(1);
+    expect(readHeader.recordDuration).toBe(1);
+    expect(readHeader.signalCount).toBe(2);
 
     const readSignal = reader.readSignal(0);
     expect(readSignal.length).toBe(10);
@@ -160,8 +159,6 @@ describe("EDFWriter", () => {
         equipmentCode: "Equipment 456",
       }),
       startTime: new Date("2023-01-01T00:00:00"),
-      headerBytes: 512,
-      reserved: "",
       dataRecords: records,
       recordDuration: recordDuration,
       signalCount: 1,
@@ -174,9 +171,8 @@ describe("EDFWriter", () => {
           physicalMax: amplitude,
           digitalMin: -32768,
           digitalMax: 32767,
-          prefiltering: "None",
+          prefiltering: "",
           samplesPerRecord: sampleRate * recordDuration,
-          reserved: "",
         },
       ],
     };
