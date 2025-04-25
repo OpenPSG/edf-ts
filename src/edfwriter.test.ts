@@ -37,7 +37,7 @@ function createTestHeader(signalCount = 1, records = 1): EDFHeader {
     }),
     startTime: new Date("2023-01-01T00:00:00"),
     headerBytes: 256 + 256 * signalCount,
-    reserved: "EDF+C",
+    reserved: "",
     dataRecords: records,
     recordDuration: 1,
     signalCount,
@@ -113,7 +113,10 @@ describe("EDFWriter", () => {
     const reader = new EDFReader(new Uint8Array(buffer));
 
     const readHeader = reader.readHeader();
-    expect(readHeader).toEqual(header);
+    expect(readHeader).toEqual({
+      ...header,
+      reserved: "EDF+C",
+    });
 
     const readSignal = reader.readSignal(0);
     expect(readSignal.length).toBe(10);

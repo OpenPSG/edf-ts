@@ -225,7 +225,12 @@ export class EDFWriter {
     text += field(dateStr, 8);
     text += field(timeStr, 8);
     text += field(String(header.headerBytes), 8);
-    text += field(header.reserved, 44);
+
+    // Mark the file as EDF+ if it has annotations, otherwise use plain EDF.
+    const hasAnnotations = this.annotations && this.annotations.length > 0;
+    const reserved = hasAnnotations ? "EDF+C" : "";
+    text += field(reserved, 44);
+
     text += field(String(header.dataRecords), 8);
     text += field(header.recordDuration.toFixed(6), 8);
     text += field(String(header.signalCount), 4);

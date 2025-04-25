@@ -1,6 +1,6 @@
 {
   "name": "edf-ts",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "A TypeScript EDF/EDF+ Reader/Writer Library",
   "type": "module",
   "main": "dist/index.js",
