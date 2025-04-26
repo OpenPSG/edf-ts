@@ -290,10 +290,10 @@ export class EDFWriter {
 
     let text = "";
 
-    // 1. Timekeeping TAL (required, even if no annotations)
+    // Timekeeping TAL (required, even if no annotations)
     text += `+${startTime.toFixed(3)}\u0014\u0014\u0000`;
 
-    // 2. One valid TAL per annotation
+    // One valid TAL per annotation
     for (const ann of anns) {
       text += `+${ann.onset.toFixed(3)}`;
       if (ann.duration !== undefined) {

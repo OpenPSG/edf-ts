@@ -1,6 +1,6 @@
 // src/edfreader.ts
 import _ from "lodash";
-var EDFReader = class {
+var EDFReader = class _EDFReader {
   constructor(byteArray) {
     this.textDecoder = new TextDecoder("ascii");
     this.view = new DataView(byteArray.buffer, byteArray.byteOffset);
@@ -116,33 +116,17 @@ var EDFReader = class {
       const text = this.textDecoder.decode(slice);
       const TALs = text.split("\0").filter((s) => s.trim().length > 0);
       for (const tal of TALs) {
-        const parts = tal.split("").filter((s) => s.length > 0);
-        if (parts.length === 0) continue;
-        const time = parts[0];
-        let onset = 0;
-        let duration = void 0;
-        if (time.startsWith("+") || time.startsWith("-")) {
-          const [onsetStr, durationStr] = time.split("");
-          onset = parseFloat(onsetStr);
-          if (durationStr !== void 0) {
-            duration = parseFloat(durationStr);
-          }
-          for (let i = 1; i < parts.length; i++) {
-            annotations.push({
-              onset,
-              duration,
-              annotation: parts[i].trim()
-            });
-          }
-        }
+        const talAnnotations = _EDFReader.parseTal(tal);
+        annotations.push(
+          ...talAnnotations.filter((a) => a.annotation.length > 0)
+        );
       }
     }
     return annotations;
   }
-  getRecordTimeStamps() {
-    if (this.recordTimestamps) return this.recordTimestamps;
+  // Returns the timestamp associated with the start of the record.
+  getRecordTimestamp(recordNumber) {
     const header = this.readHeader();
-    const timestamps = new Array(header.dataRecords).fill(0);
     const recordSize = header.signals.reduce(
       (sum, s) => sum + s.samplesPerRecord * 2,
       0
@@ -150,23 +134,52 @@ var EDFReader = class {
     const annSignalIndex = header.signals.findIndex(
       (sig) => sig.label.includes("EDF Annotations")
     );
+    if (annSignalIndex === -1) {
+      console.warn("No annotation signal found. Returning record start time.");
+      return recordNumber * header.recordDuration;
+    }
     const signalByteOffset = header.signals.slice(0, annSignalIndex).reduce((sum, s) => sum + s.samplesPerRecord * 2, 0);
     const bytes = header.signals[annSignalIndex].samplesPerRecord * 2;
-    for (let rec = 0; rec < header.dataRecords; rec++) {
-      const recOffset = header.headerBytes + rec * recordSize;
-      const start = recOffset + signalByteOffset;
-      const end = start + bytes;
-      const slice = this.byteArray.subarray(start, end);
-      const text = this.textDecoder.decode(slice).replace(/\0/g, "");
-      const entries = text.split("").filter((e) => e);
-      if (entries.length > 0 && /^[-+]/.test(entries[0])) {
-        const parts = entries[0].split("");
-        const offset = parseFloat(parts[0]) || 0;
-        timestamps[rec] = offset;
+    const recOffset = header.headerBytes + recordNumber * recordSize;
+    const start = recOffset + signalByteOffset;
+    const end = start + bytes;
+    const slice = this.byteArray.subarray(start, end);
+    const text = this.textDecoder.decode(slice).replace(/\0/g, "");
+    const TALs = text.split("\0").filter((s) => s.trim().length > 0);
+    for (const tal of TALs) {
+      const annotations = _EDFReader.parseTal(tal);
+      if (annotations.length > 0) {
+        return annotations[0].onset;
       }
     }
-    this.recordTimestamps = timestamps;
-    return timestamps;
+    return recordNumber * header.recordDuration;
+  }
+  static parseTal(tal) {
+    const SEPARATOR = String.fromCharCode(20);
+    const DURATION_MARKER = String.fromCharCode(21);
+    const annotations = [];
+    const parts = tal.split(SEPARATOR);
+    if (parts.length === 0) return [];
+    const onsetDurationPart = parts[0];
+    let onsetStr = "";
+    let durationStr = void 0;
+    const durationMarkerIndex = onsetDurationPart.indexOf(DURATION_MARKER);
+    if (durationMarkerIndex >= 0) {
+      onsetStr = onsetDurationPart.slice(0, durationMarkerIndex);
+      durationStr = onsetDurationPart.slice(durationMarkerIndex + 1);
+    } else {
+      onsetStr = onsetDurationPart;
+    }
+    const onset = parseFloat(onsetStr);
+    const duration = durationStr ? parseFloat(durationStr) : void 0;
+    for (const annotation of parts.slice(1)) {
+      annotations.push({
+        onset,
+        duration,
+        annotation
+      });
+    }
+    return annotations;
   }
   readFieldText(signalCount, start, end, signalIndex) {
     const offset = 256 + start * signalCount + (end - start) * signalIndex;

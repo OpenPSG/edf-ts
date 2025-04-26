@@ -10,7 +10,6 @@ import { EDFReader } from "./edfreader";
 let header: EDFHeader;
 let samples: number[];
 let annotations: EDFAnnotation[] = [];
-let recordTimestamps: number[] = [];
 
 beforeAll(() => {
   const byteArray = readFileSync(
@@ -23,7 +22,6 @@ beforeAll(() => {
   );
   samples = reader.readSignal(signalIndex, 0);
   annotations = reader.readAnnotations();
-  recordTimestamps = reader.getRecordTimeStamps();
 });
 
 describe("EDFReader", () => {
@@ -108,12 +106,6 @@ describe("EDFReader", () => {
     expect(annotations[1].annotation).toBe("REC STOP");
   });
 
-  test("gets record timestamps", () => {
-    expect(recordTimestamps.length).toBe(600);
-    expect(recordTimestamps[0]).toBe(0);
-    expect(recordTimestamps[599]).toBe(599);
-  });
-
   test("loads discontinuous annotations", () => {
     const byteArray = readFileSync(
       join(__dirname, "./testdata/discontinuous.edf"),
@@ -134,5 +126,35 @@ describe("EDFReader", () => {
     expect(annotations[11].onset).toBe(24784);
     expect(annotations[11].duration).toBe(17);
     expect(annotations[11].annotation).toBe("Central Apnea");
+  });
+
+  test("reads discontinuous timestamps correctly", () => {
+    const byteArray = readFileSync(
+      join(__dirname, "./testdata/discontinuous.edf"),
+    );
+
+    const reader = new EDFReader(byteArray);
+    const header = reader.readHeader();
+
+    expect(header.reserved).toBe("EDF+D");
+
+    const timestamp = reader.getRecordTimestamp(header.dataRecords - 1);
+
+    expect(timestamp).toBe(9);
+  });
+
+  test("can parse TALs", () => {
+    const talString = "+24784\x1517\x14Central Apnea\x14Another Event";
+    const parsedEvents = EDFReader.parseTal(talString);
+
+    expect(parsedEvents.length).toBe(2);
+
+    expect(parsedEvents[0].onset).toBe(24784);
+    expect(parsedEvents[0].duration).toBe(17);
+    expect(parsedEvents[0].annotation).toBe("Central Apnea");
+
+    expect(parsedEvents[1].onset).toBe(24784);
+    expect(parsedEvents[1].duration).toBe(17);
+    expect(parsedEvents[1].annotation).toBe("Another Event");
   });
 });

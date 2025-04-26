@@ -34,12 +34,12 @@ declare class EDFReader {
     private textDecoder;
     private byteArray;
     private header?;
-    private recordTimestamps?;
     constructor(byteArray: Uint8Array);
     readHeader(): EDFHeader;
     readSignal(signalIndex: number, recordNumber?: number): number[];
     readAnnotations(recordNumber?: number): EDFAnnotation[];
-    getRecordTimeStamps(): number[];
+    getRecordTimestamp(recordNumber: number): number;
+    static parseTal(tal: string): EDFAnnotation[];
     private readFieldText;
     private digitalToPhysical;
 }
