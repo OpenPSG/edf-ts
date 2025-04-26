@@ -5,7 +5,7 @@
 export type EDFVersion = "0";
 
 export interface EDFHeader {
-  version: EDFVersion;
+  version?: EDFVersion;
   patientId: string;
   recordingId: string;
   startTime: Date;

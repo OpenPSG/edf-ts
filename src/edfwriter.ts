@@ -220,7 +220,7 @@ export class EDFWriter {
     const headerBytes = 256 + 256 * header.signalCount;
 
     let text = "";
-    text += field(header.version, 8);
+    text += field(header.version ?? "0", 8);
     text += field(header.patientId, 80);
     text += field(header.recordingId, 80);
     text += field(dateStr, 8);

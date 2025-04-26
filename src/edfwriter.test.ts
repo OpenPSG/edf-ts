@@ -24,7 +24,6 @@ function createTestHeader(signalCount = 1, records = 1): EDFHeader {
     }));
 
   return {
-    version: "0",
     patientId: EDFWriter.patientId({
       hospitalCode: "MCH 0234567",
     }),
@@ -148,7 +147,6 @@ describe("EDFWriter", () => {
     });
 
     const header: EDFHeader = {
-      version: "0",
       patientId: EDFWriter.patientId({
         hospitalCode: "MCH 0234567",
       }),
