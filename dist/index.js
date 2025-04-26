@@ -135,7 +135,6 @@ var EDFReader = class _EDFReader {
       (sig) => sig.label.includes("EDF Annotations")
     );
     if (annSignalIndex === -1) {
-      console.warn("No annotation signal found. Returning record start time.");
       return recordNumber * header.recordDuration;
     }
     const signalByteOffset = header.signals.slice(0, annSignalIndex).reduce((sum, s) => sum + s.samplesPerRecord * 2, 0);

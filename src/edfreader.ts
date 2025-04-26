@@ -181,7 +181,7 @@ export class EDFReader {
     );
 
     if (annSignalIndex === -1) {
-      console.warn("No annotation signal found. Returning record start time.");
+      // Fallback to a continuous timekeeping scheme.
       return recordNumber * header.recordDuration;
     }
 
