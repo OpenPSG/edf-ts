@@ -198,14 +198,36 @@ export class EDFReader {
 
     const TALs = text.split("\u0000").filter((s) => s.trim().length > 0);
 
+    const annotations: EDFAnnotation[] = [];
+
     for (const tal of TALs) {
-      const annotations = EDFReader.parseTal(tal);
-      // The first annotation will be the timekeeping TAL.
-      if (annotations.length > 0) {
-        return annotations[0].onset;
+      const talAnnotations = EDFReader.parseTal(tal);
+
+      annotations.push(...talAnnotations);
+    }
+
+    if (annotations.length === 0) {
+      return recordNumber * header.recordDuration;
+    }
+
+    // Sort annotations by onset time
+    annotations.sort((a, b) => a.onset - b.onset);
+
+    // Get the earliest annotation
+    const earliestAnnotation = annotations[0];
+    if (earliestAnnotation.onset !== 0) {
+      return earliestAnnotation.onset;
+    } else if (earliestAnnotation.onset === 0 && recordNumber !== 0) {
+      // Are any of the annotations non-zero?
+      // I've seen a number of files in the wild with zeroed timekeeping TALs.
+      const nonZeroAnnotations = annotations.filter((a) => a.onset !== 0);
+
+      if (nonZeroAnnotations.length > 0) {
+        return nonZeroAnnotations[0].onset;
       }
     }
 
+    // Fallback to a continuous timekeeping scheme.
     return recordNumber * header.recordDuration;
   }
 

@@ -183,10 +183,22 @@ var EDFReader = class _EDFReader {
     const slice = this.byteArray.subarray(start, end);
     const text = this.textDecoder.decode(slice).replace(/\0/g, "");
     const TALs = text.split("\0").filter((s) => s.trim().length > 0);
+    const annotations = [];
     for (const tal of TALs) {
-      const annotations = _EDFReader.parseTal(tal);
-      if (annotations.length > 0) {
-        return annotations[0].onset;
+      const talAnnotations = _EDFReader.parseTal(tal);
+      annotations.push(...talAnnotations);
+    }
+    if (annotations.length === 0) {
+      return recordNumber * header.recordDuration;
+    }
+    annotations.sort((a, b) => a.onset - b.onset);
+    const earliestAnnotation = annotations[0];
+    if (earliestAnnotation.onset !== 0) {
+      return earliestAnnotation.onset;
+    } else if (earliestAnnotation.onset === 0 && recordNumber !== 0) {
+      const nonZeroAnnotations = annotations.filter((a) => a.onset !== 0);
+      if (nonZeroAnnotations.length > 0) {
+        return nonZeroAnnotations[0].onset;
       }
     }
     return recordNumber * header.recordDuration;
