@@ -56,9 +56,9 @@ function expectToBeImprecise(
 describe("EDFWriter", () => {
   it("writes a simple EDF file without annotations", () => {
     const header = createTestHeader(1, 2);
-    const signalData = [[...Array(20).keys()].map((i) => i - 10)];
+    const values = [[...Array(20).keys()].map((i) => i - 10)];
 
-    const writer = new EDFWriter(header, signalData);
+    const writer = new EDFWriter(header, values);
     const buffer = writer.write();
 
     expect(buffer).toBeInstanceOf(ArrayBuffer);
@@ -71,16 +71,16 @@ describe("EDFWriter", () => {
     expect(readHeader.recordDuration).toBe(1);
     expect(readHeader.signalCount).toBe(1);
 
-    const readSignal = reader.readSignal(0);
-    expect(readSignal.length).toBe(20);
-    expectToBeImprecise(readSignal, signalData[0]);
+    const readValues = reader.readValues(0);
+    expect(readValues.length).toBe(20);
+    expectToBeImprecise(readValues, values[0]);
   });
 
   it("pads signal data when too short", () => {
     const header = createTestHeader(1, 2);
-    const signalData = [[1, 2, 3]]; // too short, will be padded
+    const values = [[1, 2, 3]]; // too short, will be padded
 
-    const writer = new EDFWriter(header, signalData);
+    const writer = new EDFWriter(header, values);
     const buffer = writer.write();
 
     expect(buffer.byteLength).toBeGreaterThan(256);
@@ -88,21 +88,21 @@ describe("EDFWriter", () => {
 
   it("throws if signal data is too long", () => {
     const header = createTestHeader(1, 1);
-    const signalData = [[...Array(20).fill(0)]]; // too long
+    const values = [[...Array(20).fill(0)]]; // too long
 
-    expect(() => new EDFWriter(header, signalData).write()).toThrow();
+    expect(() => new EDFWriter(header, values).write()).toThrow();
   });
 
   it("writes with annotations if present", () => {
     const header = createTestHeader(1, 1);
-    const signalData = [[...Array(10).keys()].map((i) => i - 10)];
+    const values = [[...Array(10).keys()].map((i) => i - 10)];
 
     const annotations: EDFAnnotation[] = [
       { onset: 0, duration: 0.5, annotation: "Start" },
       { onset: 0.5, annotation: "Event A" },
     ];
 
-    const writer = new EDFWriter(header, signalData, annotations);
+    const writer = new EDFWriter(header, values, annotations);
     const buffer = writer.write();
 
     expect(buffer).toBeInstanceOf(ArrayBuffer);
@@ -116,9 +116,9 @@ describe("EDFWriter", () => {
     expect(readHeader.recordDuration).toBe(1);
     expect(readHeader.signalCount).toBe(2);
 
-    const readSignal = reader.readSignal(0);
-    expect(readSignal.length).toBe(10);
-    expectToBeImprecise(readSignal, signalData[0]);
+    const readValues = reader.readValues(0);
+    expect(readValues.length).toBe(10);
+    expectToBeImprecise(readValues, values[0]);
 
     const readAnnnotations = reader.readAnnotations();
     expect(readAnnnotations.length).toBe(2);

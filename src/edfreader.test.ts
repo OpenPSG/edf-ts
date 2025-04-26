@@ -20,7 +20,7 @@ beforeAll(() => {
   const signalIndex = header.signals.findIndex((signal) =>
     signal.label.includes("sine 8.5 Hz"),
   );
-  samples = reader.readSignal(signalIndex, 0);
+  samples = reader.readValues(signalIndex, 0);
   annotations = reader.readAnnotations();
 });
 

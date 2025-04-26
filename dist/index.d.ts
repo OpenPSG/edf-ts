@@ -46,10 +46,10 @@ declare class EDFReader {
 
 declare class EDFWriter {
     private header;
-    private signalData;
+    private values;
     private annotations?;
     private textEncoder;
-    constructor(header: EDFHeader, signalData: number[][], annotations?: EDFAnnotation[] | undefined);
+    constructor(header: EDFHeader, values: number[][], annotations?: EDFAnnotation[] | undefined);
     write(): ArrayBuffer;
     static patientId({ hospitalCode, sex, birthdate, name, }: {
         hospitalCode?: string;

@@ -208,27 +208,27 @@ var EDFReader = class _EDFReader {
 // src/edfwriter.ts
 import { format } from "date-fns";
 var EDFWriter = class {
-  constructor(header, signalData, annotations) {
+  constructor(header, values, annotations) {
     this.header = header;
-    this.signalData = signalData;
+    this.values = values;
     this.annotations = annotations;
     this.textEncoder = new TextEncoder();
     this.configureAnnotationSignal();
   }
   write() {
-    const { header, signalData } = this;
+    const { header, values } = this;
     const signalCount = header.signalCount;
     const records = header.dataRecords;
-    if (signalData.length !== signalCount) {
+    if (values.length !== signalCount) {
       throw new Error("Signal data length does not match signal count");
     }
     for (let i = 0; i < signalCount; i++) {
       const signal = header.signals[i];
       const expectedSamples = signal.samplesPerRecord * records;
-      const currentSamples = signalData[i].length;
+      const currentSamples = values[i].length;
       if (currentSamples < expectedSamples) {
         const padAmount = expectedSamples - currentSamples;
-        signalData[i] = signalData[i].concat(Array(padAmount).fill(0));
+        values[i] = values[i].concat(Array(padAmount).fill(0));
       } else if (currentSamples > expectedSamples) {
         throw new Error(
           `Signal ${i} has too many samples (${currentSamples} > ${expectedSamples})`
@@ -255,7 +255,7 @@ var EDFWriter = class {
           );
           dataBytes.push(...encodedAnn);
         } else {
-          for (const sample of signalData[s].slice(start, end)) {
+          for (const sample of values[s].slice(start, end)) {
             const raw = this.physicalToDigital(sample, signal);
             dataBytes.push(raw & 255, raw >> 8 & 255);
           }
@@ -331,19 +331,19 @@ var EDFWriter = class {
     );
     this.header.signals[annotationIndex].samplesPerRecord = samplesPerRecord;
     const totalSamples = samplesPerRecord * this.header.dataRecords;
-    while (this.signalData.length <= annotationIndex) {
-      this.signalData.push([]);
+    while (this.values.length <= annotationIndex) {
+      this.values.push([]);
     }
-    const signal = this.signalData[annotationIndex];
+    const signal = this.values[annotationIndex];
     if (signal.length === 0) {
-      this.signalData[annotationIndex] = Array(totalSamples).fill(0);
+      this.values[annotationIndex] = Array(totalSamples).fill(0);
     } else if (signal.length < totalSamples) {
-      this.signalData[annotationIndex] = signal.concat(
+      this.values[annotationIndex] = signal.concat(
         Array(totalSamples - signal.length).fill(0)
       );
     } else if (signal.length > totalSamples) {
       throw new Error(
-        "Annotation signalData too long for configured samplesPerRecord"
+        "Annotation values too long for configured samplesPerRecord"
       );
     }
   }
