@@ -36,7 +36,7 @@ declare class EDFReader {
     private header?;
     constructor(byteArray: Uint8Array);
     readHeader(): EDFHeader;
-    readSignal(signalIndex: number, recordNumber?: number): number[];
+    readValues(signalIndex: number, recordNumber?: number): number[];
     readAnnotations(recordNumber?: number): EDFAnnotation[];
     getRecordTimestamp(recordNumber: number): number;
     static parseTal(tal: string): EDFAnnotation[];

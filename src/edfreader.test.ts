@@ -13,7 +13,7 @@ let annotations: EDFAnnotation[] = [];
 
 beforeAll(() => {
   const byteArray = readFileSync(
-    join(__dirname, "./testdata/test_generator_2.edf"),
+    join(__dirname, "./__fixtures__/test_generator_2.edf"),
   );
   const reader = new EDFReader(byteArray);
   header = reader.readHeader();
@@ -108,7 +108,7 @@ describe("EDFReader", () => {
 
   test("loads discontinuous annotations", () => {
     const byteArray = readFileSync(
-      join(__dirname, "./testdata/discontinuous.edf"),
+      join(__dirname, "./__fixtures__/discontinuous.edf"),
     );
 
     const reader = new EDFReader(byteArray);
@@ -130,7 +130,7 @@ describe("EDFReader", () => {
 
   test("reads discontinuous timestamps correctly", () => {
     const byteArray = readFileSync(
-      join(__dirname, "./testdata/discontinuous.edf"),
+      join(__dirname, "./__fixtures__/discontinuous.edf"),
     );
 
     const reader = new EDFReader(byteArray);

@@ -67,7 +67,7 @@ var EDFReader = class _EDFReader {
     };
     return _.cloneDeep(this.header);
   }
-  readSignal(signalIndex, recordNumber) {
+  readValues(signalIndex, recordNumber) {
     const header = this.header ?? this.readHeader();
     const signal = header.signals[signalIndex];
     const samplesPerRecord = signal.samplesPerRecord;
