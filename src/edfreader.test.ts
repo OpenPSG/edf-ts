@@ -17,10 +17,7 @@ beforeAll(() => {
   );
   const reader = new EDFReader(byteArray);
   header = reader.readHeader();
-  const signalIndex = header.signals.findIndex((signal) =>
-    signal.label.includes("sine 8.5 Hz"),
-  );
-  samples = reader.readValues(signalIndex, 0);
+  samples = reader.readValues("sine 8.5 Hz", 0);
   annotations = reader.readAnnotations();
 });
 
@@ -32,11 +29,10 @@ describe("EDFReader", () => {
     expect(header.startTime.toDateString()).toBe(
       new Date(2009, 11, 10, 12, 44, 2).toDateString(),
     );
-    expect(header.headerBytes).toBe(3328);
     expect(header.reserved).toBe("EDF+C");
     expect(header.dataRecords).toBe(600);
     expect(header.recordDuration).toBe(1);
-    expect(header.signalCount).toBe(12);
+    expect(header.signalCount).toBe(11);
 
     const expectedSignals = [
       "squarewave",
@@ -50,7 +46,6 @@ describe("EDFReader", () => {
       "sine 15 Hz",
       "sine 17 Hz",
       "sine 50 Hz",
-      "EDF Annotations",
     ];
 
     expectedSignals.forEach((label, index) => {

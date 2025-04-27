@@ -102,13 +102,28 @@ var EDFReader = class _EDFReader {
       signalCount,
       signals
     };
-    return import_lodash.default.cloneDeep(this.header);
+    const clonedHeader = import_lodash.default.cloneDeep(this.header);
+    clonedHeader.headerBytes = void 0;
+    const annSignalIndex = clonedHeader.signals.findIndex(
+      (sig) => sig.label.includes("EDF Annotations")
+    );
+    if (annSignalIndex !== -1) {
+      clonedHeader.signals.splice(annSignalIndex, 1);
+      clonedHeader.signalCount = clonedHeader.signals.length;
+    }
+    return clonedHeader;
   }
-  readValues(signalIndex, recordNumber) {
+  readValues(signalLabel, recordNumber) {
     const header = this.header ?? this.readHeader();
+    const signalIndex = header.signals.findIndex(
+      (s) => s.label.trim() === signalLabel.trim()
+    );
+    if (signalIndex === -1) {
+      throw new Error(`Signal with label "${signalLabel}" not found.`);
+    }
     const signal = header.signals[signalIndex];
     const samplesPerRecord = signal.samplesPerRecord;
-    const samples = [];
+    const values = [];
     const offset = header.headerBytes;
     const recordSize = header.signals.reduce(
       (sum, s) => sum + s.samplesPerRecord * 2,
@@ -123,10 +138,10 @@ var EDFReader = class _EDFReader {
         const sampleOffset = recOffset + signalByteOffset + j * 2;
         const raw = this.view.getInt16(sampleOffset, true);
         const physical = this.digitalToPhysical(raw, signal);
-        samples.push(physical);
+        values.push(physical);
       }
     }
-    return samples;
+    return values;
   }
   readAnnotations(recordNumber) {
     const header = this.header ?? this.readHeader();
@@ -257,7 +272,7 @@ var EDFWriter = class {
     const signalCount = header.signalCount;
     const records = header.dataRecords;
     if (values.length !== signalCount) {
-      throw new Error("Signal data length does not match signal count");
+      throw new Error("Too few signal values provided");
     }
     for (let i = 0; i < signalCount; i++) {
       const signal = header.signals[i];
@@ -266,25 +281,30 @@ var EDFWriter = class {
       if (currentSamples < expectedSamples) {
         const padAmount = expectedSamples - currentSamples;
         values[i] = values[i].concat(Array(padAmount).fill(0));
-      } else if (currentSamples > expectedSamples) {
-        throw new Error(
-          `Signal ${i} has too many samples (${currentSamples} > ${expectedSamples})`
-        );
       }
+    }
+    let bytesPerRecord = 0;
+    for (const signal of header.signals) {
+      bytesPerRecord += signal.samplesPerRecord * 2;
+    }
+    if (bytesPerRecord > 61440) {
+      console.error(
+        `Each data record is ${bytesPerRecord} bytes, exceeding the recommended maximum of 61440 bytes (EDF spec).`
+      );
     }
     const headerString = this.buildHeader();
     const headerBytes = this.textEncoder.encode(headerString);
     const dataBytes = [];
-    const annotationSignalIndex = header.signals.findIndex(
+    const annSignalIndex = header.signals.findIndex(
       (sig) => sig.label.includes("EDF Annotations")
     );
-    const hasAnnotations = annotationSignalIndex !== -1;
+    const hasAnnotations = annSignalIndex !== -1;
     for (let recordNumber = 0; recordNumber < records; recordNumber++) {
       for (let s = 0; s < signalCount; s++) {
         const signal = header.signals[s];
         const start = recordNumber * signal.samplesPerRecord;
         const end = start + signal.samplesPerRecord;
-        if (hasAnnotations && s === annotationSignalIndex) {
+        if (hasAnnotations && s === annSignalIndex) {
           const annText = this.generateAnnotationBlock(recordNumber);
           const encodedAnn = this.encodeAnnotationSignal(
             annText,

@@ -22,7 +22,7 @@ export class EDFWriter {
     const records = header.dataRecords;
 
     if (values.length !== signalCount) {
-      throw new Error("Signal data length does not match signal count");
+      throw new Error("Too few signal values provided");
     }
 
     for (let i = 0; i < signalCount; i++) {
@@ -33,21 +33,29 @@ export class EDFWriter {
       if (currentSamples < expectedSamples) {
         const padAmount = expectedSamples - currentSamples;
         values[i] = values[i].concat(Array(padAmount).fill(0));
-      } else if (currentSamples > expectedSamples) {
-        throw new Error(
-          `Signal ${i} has too many samples (${currentSamples} > ${expectedSamples})`,
-        );
       }
+    }
+
+    let bytesPerRecord = 0;
+    for (const signal of header.signals) {
+      bytesPerRecord += signal.samplesPerRecord * 2;
+    }
+
+    if (bytesPerRecord > 61440) {
+      // Use a smaller number of samples per record to avoid exceeding the limit.
+      console.error(
+        `Each data record is ${bytesPerRecord} bytes, exceeding the recommended maximum of 61440 bytes (EDF spec).`,
+      );
     }
 
     const headerString = this.buildHeader();
     const headerBytes = this.textEncoder.encode(headerString);
     const dataBytes: number[] = [];
 
-    const annotationSignalIndex = header.signals.findIndex((sig) =>
+    const annSignalIndex = header.signals.findIndex((sig) =>
       sig.label.includes("EDF Annotations"),
     );
-    const hasAnnotations = annotationSignalIndex !== -1;
+    const hasAnnotations = annSignalIndex !== -1;
 
     for (let recordNumber = 0; recordNumber < records; recordNumber++) {
       for (let s = 0; s < signalCount; s++) {
@@ -55,7 +63,7 @@ export class EDFWriter {
         const start = recordNumber * signal.samplesPerRecord;
         const end = start + signal.samplesPerRecord;
 
-        if (hasAnnotations && s === annotationSignalIndex) {
+        if (hasAnnotations && s === annSignalIndex) {
           const annText = this.generateAnnotationBlock(recordNumber);
           const encodedAnn = this.encodeAnnotationSignal(
             annText,

@@ -71,7 +71,7 @@ describe("EDFWriter", () => {
     expect(readHeader.recordDuration).toBe(1);
     expect(readHeader.signalCount).toBe(1);
 
-    const readValues = reader.readValues(0);
+    const readValues = reader.readValues("Signal1");
     expect(readValues.length).toBe(20);
     expectToBeImprecise(readValues, values[0]);
   });
@@ -84,13 +84,6 @@ describe("EDFWriter", () => {
     const buffer = writer.write();
 
     expect(buffer.byteLength).toBeGreaterThan(256);
-  });
-
-  it("throws if signal data is too long", () => {
-    const header = createTestHeader(1, 1);
-    const values = [[...Array(20).fill(0)]]; // too long
-
-    expect(() => new EDFWriter(header, values).write()).toThrow();
   });
 
   it("writes with annotations if present", () => {
@@ -114,9 +107,9 @@ describe("EDFWriter", () => {
     expect(readHeader.reserved).toBe("EDF+C");
     expect(readHeader.dataRecords).toBe(1);
     expect(readHeader.recordDuration).toBe(1);
-    expect(readHeader.signalCount).toBe(2);
+    expect(readHeader.signalCount).toBe(1);
 
-    const readValues = reader.readValues(0);
+    const readValues = reader.readValues("Signal1");
     expect(readValues.length).toBe(10);
     expectToBeImprecise(readValues, values[0]);
 

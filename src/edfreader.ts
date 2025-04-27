@@ -83,14 +83,33 @@ export class EDFReader {
       signals,
     };
 
-    return _.cloneDeep(this.header);
+    const clonedHeader = _.cloneDeep(this.header);
+    clonedHeader.headerBytes = undefined;
+
+    // Hide the annotations "meta" signal from the consumer, it's not a real signal.
+    const annSignalIndex = clonedHeader.signals.findIndex((sig) =>
+      sig.label.includes("EDF Annotations"),
+    );
+    if (annSignalIndex !== -1) {
+      clonedHeader.signals.splice(annSignalIndex, 1);
+      clonedHeader.signalCount = clonedHeader.signals.length;
+    }
+
+    return clonedHeader;
   }
 
-  readValues(signalIndex: number, recordNumber?: number): number[] {
+  readValues(signalLabel: string, recordNumber?: number): number[] {
     const header = this.header ?? this.readHeader();
+    const signalIndex = header.signals.findIndex(
+      (s) => s.label.trim() === signalLabel.trim(),
+    );
+    if (signalIndex === -1) {
+      throw new Error(`Signal with label "${signalLabel}" not found.`);
+    }
+
     const signal = header.signals[signalIndex];
     const samplesPerRecord = signal.samplesPerRecord;
-    const samples: number[] = [];
+    const values: number[] = [];
 
     const offset = header.headerBytes!;
     const recordSize = header.signals.reduce(
@@ -113,11 +132,11 @@ export class EDFReader {
         const sampleOffset = recOffset + signalByteOffset + j * 2;
         const raw = this.view.getInt16(sampleOffset, true);
         const physical = this.digitalToPhysical(raw, signal);
-        samples.push(physical);
+        values.push(physical);
       }
     }
 
-    return samples;
+    return values;
   }
 
   readAnnotations(recordNumber?: number): EDFAnnotation[] {
